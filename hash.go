@@ -56,7 +56,6 @@ func main() {
 	var password string
 	fmt.Println("Write your password:")
 	fmt.Scanln(&password)
-	//password := "password123"
 
 	hash, err := hashPassword(password)
 	if err != nil {
