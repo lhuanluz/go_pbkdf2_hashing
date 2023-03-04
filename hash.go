@@ -1,14 +1,17 @@
 package main
 
 import (
-	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/base64"
 	"fmt"
 	"golang.org/x/crypto/pbkdf2"
 	"strings"
+	"time"
 )
+
+const iterations = 10000
 
 func hashPassword(password string) (string, error) {
 	// Generate a random salt
@@ -19,13 +22,15 @@ func hashPassword(password string) (string, error) {
 	}
 
 	// Generate the hash with the salt using PBKDF2
-	hash := pbkdf2.Key([]byte(password), salt, 10000, 32, sha256.New)
+	hash := pbkdf2.Key([]byte(password), salt, iterations, 32, sha256.New)
 
 	// Encode the salt and hash as base64 strings
-	saltString := base64.StdEncoding.EncodeToString(salt)
-	hashString := base64.StdEncoding.EncodeToString(hash)
+	var b strings.Builder
+	b.WriteString(base64.StdEncoding.EncodeToString(salt))
+	b.WriteString(":")
+	b.WriteString(base64.StdEncoding.EncodeToString(hash))
 
-	return fmt.Sprintf("%s:%s", saltString, hashString), nil
+	return b.String(), nil
 }
 
 func verifyPassword(password, hashedPassword string) (bool, error) {
@@ -46,10 +51,10 @@ func verifyPassword(password, hashedPassword string) (bool, error) {
 	}
 
 	// Generate a hash with the same salt using PBKDF2
-	testHash := pbkdf2.Key([]byte(password), salt, 10000, 32, sha256.New)
+	testHash := pbkdf2.Key([]byte(password), salt, iterations, 32, sha256.New)
 
 	// Compare the generated hash with the stored hash
-	return hmac.Equal(hash, testHash), nil
+	return subtle.ConstantTimeCompare(hash, testHash) == 1, nil
 }
 
 func main() {
@@ -57,18 +62,24 @@ func main() {
 	fmt.Println("Write your password:")
 	fmt.Scanln(&password)
 
+	start := time.Now()
 	hash, err := hashPassword(password)
+	duration := time.Since(start)
 	if err != nil {
 		fmt.Println("Error:", err)
 		return
 	}
 
 	fmt.Println("Hashed password:", hash)
+	fmt.Println("Hashing took", duration)
 
 	// Verify a password
 	fmt.Println("Write a password for verification:")
 	fmt.Scanln(&password)
+
+	start = time.Now()
 	match, err := verifyPassword(password, hash)
+	duration = time.Since(start)
 	if err != nil {
 		fmt.Println("Error:", err)
 		return
@@ -78,4 +89,5 @@ func main() {
 	} else {
 		fmt.Println("Invalid password")
 	}
+	fmt.Println("Verification took", duration)
 }
